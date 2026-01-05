@@ -13,12 +13,37 @@ uploaded_file = st.file_uploader(
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file)
+        COLUMN_MAP = {
+    "Дата": ["дата", "date", "дата продажи", "sale date"],
+    "Товар": ["товар", "product", "название", "наименование"],
+    "Категория": ["категория", "category", "группа"],
+    "Цена": ["цена", "price", "стоимость", "cost"],
+    "Количество": ["количество", "qty", "quantity", "count", "штук"]
+}
 
-        required_cols = ['Дата', 'Товар', 'Категория', 'Цена', 'Количество']
-        for col in required_cols:
-            if col not in df.columns:
-                st.error(f"В файле нет столбца: {col}")
-                st.stop()
+        normalized_cols = {col.lower(): col for col in df.columns}
+        rename_dict = {}
+
+        for standard_col, variants in COLUMN_MAP.items():
+            for variant in variants:
+                if variant in normalized_cols:
+                    rename_dict[normalized_cols[variant]] = standard_col
+                    break
+
+        df = df.rename(columns=rename_dict)
+        if rename_dict:
+            st.success("Распознаны столбцы:")
+            st.json(rename_dict)
+        # Проверка наличия обязательных столбцов
+        required_cols = list(COLUMN_MAP.keys())
+        missing = [col for col in required_cols if col not in df.columns]
+
+        if missing:
+            st.error(
+        "❌ Не удалось найти столбцы: " + ", ".join(missing) +
+        "\n\nПроверьте названия столбцов или обратитесь за адаптацией."
+    )
+            st.stop()
 
         # Приведение типов
         df['Дата'] = pd.to_datetime(df['Дата'], dayfirst=True, errors='coerce')
@@ -67,7 +92,9 @@ if uploaded_file:
            bad_words = ["ошибка", "тест", "demo", "sample"]
            mask = ~df["Товар"].str.lower().str.contains("|".join(bad_words))
            df = df[mask]
-
+        if df.empty:
+            st.warning("❗ По выбранным условиям данных нет")
+            st.stop()
         # ===== Итоговый отчёт =====
         summary = pd.DataFrame({
             "Показатель": [
